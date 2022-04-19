@@ -6,9 +6,7 @@ import (
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/adapter"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/kubeinteraction"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params"
-	"github.com/openshift-pipelines/pipelines-as-code/pkg/reconciler"
 	evadapter "knative.dev/eventing/pkg/adapter/v2"
-	"knative.dev/pkg/injection/sharedmain"
 	"knative.dev/pkg/signals"
 )
 
@@ -35,8 +33,6 @@ func main() {
 	}
 
 	run.Info.Pac.LogURL = run.Clients.ConsoleUI.URL()
-
-	go sharedmain.MainWithContext(ctx, "", reconciler.NewController(run, kinteract))
 
 	evadapter.MainWithContext(ctx, PACControllerLogKey, adapter.NewEnvConfig, adapter.New(run, kinteract))
 }
