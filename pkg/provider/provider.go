@@ -4,6 +4,14 @@ import (
 	"regexp"
 )
 
+const (
+	ProviderGitHubApp       = "GitHubApp"
+	ProviderGitHubWebhook   = "GitHubWebhook"
+	ProviderBitbucketCloud  = "BitbucketCloud"
+	ProviderBitbucketServer = "BitbucketServer"
+	ProviderGitlab          = "Gitlab"
+)
+
 var (
 	retestRegex   = regexp.MustCompile(`(?m)^/retest\s*$`)
 	oktotestRegex = regexp.MustCompile(`(?m)^/ok-to-test\s*$`)

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode"
 	apipac "github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/formatting"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/kubeinteraction"
@@ -69,15 +70,17 @@ func Run(ctx context.Context, cs *params.Run, providerintf provider.Interface, k
 	// so instead of having to specify their in Repo each time, they use a
 	// shared one from pac.
 	if repo.Spec.GitProvider != nil {
-		err := secretFromRepository(ctx, cs, k8int, providerintf.GetConfig(), event, repo)
+		err := SecretFromRepository(ctx, cs, k8int, providerintf.GetConfig(), event, repo)
 		if err != nil {
 			return err
 		}
 	} else {
-		event.Provider.WebhookSecret, _ = getCurrentNSWebhookSecret(ctx, k8int)
+		event.Provider.WebhookSecret, _ = GetCurrentNSWebhookSecret(ctx, k8int)
 	}
-	if err := providerintf.Validate(ctx, cs, event); err != nil {
-		return fmt.Errorf("could not validate payload, check your webhook secret?: %w", err)
+	if providerintf.GetName() != provider.ProviderGitHubApp {
+		if err := providerintf.Validate(ctx, cs, event); err != nil {
+			return fmt.Errorf("could not validate payload, check your webhook secret?: %w", err)
+		}
 	}
 	// Set the client, we should error out if there is a problem with
 	// token or secret or we won't be able to do much.
@@ -128,7 +131,7 @@ func Run(ctx context.Context, cs *params.Run, providerintf provider.Interface, k
 	}
 
 	// Match the pipelinerun with annotation
-	pipelineRun, annotationRepo, config, err := matcher.MatchPipelinerunByAnnotation(ctx, pipelineRuns, cs, event)
+	pipelineRun, annotationRepo, _, err := matcher.MatchPipelinerunByAnnotation(ctx, pipelineRuns, cs, event)
 	if err != nil {
 		// Don't fail when you don't have a match between pipeline and annotations
 		cs.Clients.Log.Warn(err.Error())
@@ -149,6 +152,16 @@ func Run(ctx context.Context, cs *params.Run, providerintf provider.Interface, k
 
 	// Add labels and annotations to pipelinerun
 	kubeinteraction.AddLabelsAndAnnotations(event, pipelineRun, repo)
+
+	// add provider label
+	pipelineRun.Annotations[filepath.Join(pipelinesascode.GroupName, "provider")] = providerintf.GetName()
+
+	if providerintf.GetName() == provider.ProviderGitHubApp {
+		pipelineRun.Annotations[filepath.Join(pipelinesascode.GroupName, "installation-id")] = strconv.FormatInt(event.InstallationID, 10)
+		if event.GHEURL != "" {
+			pipelineRun.Annotations[filepath.Join(pipelinesascode.GroupName, "ghe-url")] = event.GHEURL
+		}
+	}
 
 	// Create the actual pipeline
 	pr, err := cs.Clients.Tekton.TektonV1beta1().PipelineRuns(repo.GetNamespace()).Create(ctx, pipelineRun, metav1.CreateOptions{})
@@ -183,41 +196,43 @@ func Run(ctx context.Context, cs *params.Run, providerintf provider.Interface, k
 	}
 	cs.Clients.Log.Infof("Waiting for PipelineRun %s/%s to Succeed in a maximum time of %s minutes",
 		pr.Namespace, pr.Name, formatting.HumanDuration(duration))
-	if err := k8int.WaitForPipelineRunSucceed(ctx, cs.Clients.Tekton.TektonV1beta1(), pr, duration); err != nil {
-		// if we have a timeout from the pipeline run, we would not know it. We would need to get the PR status to know.
-		// maybe something to improve in the future.
-		cs.Clients.Log.Errorf("pipelinerun has failed: %s", err.Error())
-	}
+	//if err := k8int.WaitForPipelineRunSucceed(ctx, cs.Clients.Tekton.TektonV1beta1(), pr, duration); err != nil {
+	//	// if we have a timeout from the pipeline run, we would not know it. We would need to get the PR status to know.
+	//	// maybe something to improve in the future.
+	//	cs.Clients.Log.Errorf("pipelinerun has failed: %s", err.Error())
+	//}
+	//
+	//// Cleanup old succeeded pipelineruns
+	//if keepMaxPipeline, ok := config["max-keep-runs"]; ok {
+	//	max, err := strconv.Atoi(keepMaxPipeline)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	err = k8int.CleanupPipelines(ctx, repo, pr, max)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+	//
+	//// remove the generated secret after completion of pipelinerun
+	//if cs.Info.Pac.SecretAutoCreation {
+	//	err = k8int.DeleteBasicAuthSecret(ctx, event, repo.GetNamespace())
+	//	if err != nil {
+	//		return fmt.Errorf("deleting basic auth secret has failed: %w ", err)
+	//	}
+	//}
+	//
+	//// Post the final status to GitHub check status with a nice breakdown and
+	//// tekton cli describe output.
+	//newPr, err := postFinalStatus(ctx, cs, providerintf, event, pr)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//return updateRepoRunStatus(ctx, cs, event, newPr, repo)
 
-	// Cleanup old succeeded pipelineruns
-	if keepMaxPipeline, ok := config["max-keep-runs"]; ok {
-		max, err := strconv.Atoi(keepMaxPipeline)
-		if err != nil {
-			return err
-		}
-
-		err = k8int.CleanupPipelines(ctx, repo, pr, max)
-		if err != nil {
-			return err
-		}
-	}
-
-	// remove the generated secret after completion of pipelinerun
-	if cs.Info.Pac.SecretAutoCreation {
-		err = k8int.DeleteBasicAuthSecret(ctx, event, repo.GetNamespace())
-		if err != nil {
-			return fmt.Errorf("deleting basic auth secret has failed: %w ", err)
-		}
-	}
-
-	// Post the final status to GitHub check status with a nice breakdown and
-	// tekton cli describe output.
-	newPr, err := postFinalStatus(ctx, cs, providerintf, event, pr)
-	if err != nil {
-		return err
-	}
-
-	return updateRepoRunStatus(ctx, cs, event, newPr, repo)
+	return nil
 }
 
 func getAllPipelineRuns(ctx context.Context, cs *params.Run, providerintf provider.Interface, event *info.Event) ([]*tektonv1beta1.PipelineRun, error) {

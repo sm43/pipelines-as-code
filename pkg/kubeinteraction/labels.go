@@ -2,6 +2,7 @@ package kubeinteraction
 
 import (
 	"path/filepath"
+	"strconv"
 
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode"
 	apipac "github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode/v1alpha1"
@@ -36,5 +37,9 @@ func AddLabelsAndAnnotations(event *info.Event, pipelineRun *tektonv1beta1.Pipel
 	}
 	for k, v := range annotations {
 		pipelineRun.Annotations[k] = v
+	}
+
+	if event.PullRequestNumber != 0 {
+		pipelineRun.Annotations[filepath.Join(pipelinesascode.GroupName, "pull-request")] = strconv.Itoa(event.PullRequestNumber)
 	}
 }

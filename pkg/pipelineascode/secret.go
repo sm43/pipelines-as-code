@@ -19,8 +19,8 @@ const (
 	defaultPipelinesAscodeSecretWebhookSecretKey = "webhook.secret"
 )
 
-// secretFromRepository grab the secret from the repository CRD
-func secretFromRepository(ctx context.Context, cs *params.Run, k8int kubeinteraction.Interface, config *info.ProviderConfig, event *info.Event, repo *apipac.Repository) error {
+// SecretFromRepository grab the secret from the repository CRD
+func SecretFromRepository(ctx context.Context, cs *params.Run, k8int kubeinteraction.Interface, config *info.ProviderConfig, event *info.Event, repo *apipac.Repository) error {
 	var err error
 	if repo.Spec.GitProvider.URL == "" {
 		repo.Spec.GitProvider.URL = config.APIURL
@@ -81,7 +81,7 @@ func secretFromRepository(ctx context.Context, cs *params.Run, k8int kubeinterac
 }
 
 // getCurrentNSWebhookSecret get secret from current namespace if it exists
-func getCurrentNSWebhookSecret(ctx context.Context, k8int kubeinteraction.Interface) (string, error) {
+func GetCurrentNSWebhookSecret(ctx context.Context, k8int kubeinteraction.Interface) (string, error) {
 	s, err := k8int.GetSecret(ctx, kubeinteraction.GetSecretOpt{
 		Namespace: os.Getenv("SYSTEM_NAMESPACE"),
 		Name:      defaultPipelinesAscodeSecretName,

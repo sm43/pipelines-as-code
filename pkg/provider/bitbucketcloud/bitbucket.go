@@ -3,6 +3,7 @@ package bitbucketcloud
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ktrysmt/go-bitbucket"
@@ -26,6 +27,10 @@ const taskStatusTemplate = `| **Status** | **Duration** | **Name** |
 
 func (v *Provider) Validate(ctx context.Context, params *params.Run, event *info.Event) error {
 	return nil
+}
+
+func (v *Provider) GetName() string {
+	return provider.ProviderBitbucketCloud
 }
 
 func (v *Provider) GetConfig() *info.ProviderConfig {
@@ -83,10 +88,12 @@ func (v *Provider) CreateStatus(_ context.Context, event *info.Event, pacopts *i
 	}
 	if statusopts.Conclusion != "STOPPED" && statusopts.Status == "completed" &&
 		statusopts.Text != "" && event.EventType == "pull_request" {
-		prNumber, err := v.getPullRequestNumber(event.Event)
-		if err != nil {
-			return err
-		}
+		//prNumber, err := v.getPullRequestNumber(event.Event)
+		//if err != nil {
+		//	return err
+		//}
+
+		prNumber := strconv.Itoa(event.PullRequestNumber)
 
 		_, err = v.Client.Repositories.PullRequests.AddComment(
 			&bitbucket.PullRequestCommentOptions{

@@ -49,7 +49,7 @@ func Setup(ctx context.Context, viaDirectWebhook bool) (*params.Run, options.E2E
 	}
 
 	run := &params.Run{}
-	if err := run.Clients.NewClients(ctx, &run.Info); err != nil {
+	if err := run.Clients.NewClients(ctx, &run.Info, nil); err != nil {
 		return nil, options.E2E{}, github.Provider{}, err
 	}
 	e2eoptions := options.E2E{Organization: splitted[0], Repo: splitted[1], DirectWebhook: viaDirectWebhook}

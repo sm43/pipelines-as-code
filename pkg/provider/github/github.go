@@ -22,6 +22,14 @@ type Provider struct {
 	Client        *github.Client
 	Token, APIURL *string
 	ApplicationID *int64
+	whichType     string
+}
+
+func (v *Provider) GetName() string {
+	if v.whichType != "" {
+		return v.whichType
+	}
+	return provider.ProviderGitHubWebhook
 }
 
 func (v *Provider) Validate(ctx context.Context, cs *params.Run, event *info.Event) error {

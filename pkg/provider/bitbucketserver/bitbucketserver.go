@@ -27,6 +27,10 @@ type Provider struct {
 	projectKey                string
 }
 
+func (v *Provider) GetName() string {
+	return provider.ProviderBitbucketServer
+}
+
 func (v *Provider) Validate(ctx context.Context, params *params.Run, event *info.Event) error {
 	signature := event.Request.Header.Get("X-Hub-Signature")
 	if event.Provider.WebhookSecret == "" && signature != "" {

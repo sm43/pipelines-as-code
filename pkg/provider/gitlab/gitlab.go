@@ -43,6 +43,10 @@ type Provider struct {
 	repoURL           string
 }
 
+func (v *Provider) GetName() string {
+	return provider.ProviderGitlab
+}
+
 func (v *Provider) Validate(ctx context.Context, params *params.Run, event *info.Event) error {
 	token := event.Request.Header.Get("X-Gitlab-Token")
 	if event.Provider.WebhookSecret == "" && token != "" {

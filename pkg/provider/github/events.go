@@ -15,6 +15,7 @@ import (
 	"github.com/google/go-github/v43/github"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/info"
+	"github.com/openshift-pipelines/pipelines-as-code/pkg/provider"
 	"go.uber.org/zap"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -24,7 +25,7 @@ const (
 	secretName = "pipelines-as-code-secret"
 )
 
-func (v *Provider) getAppToken(ctx context.Context, kube kubernetes.Interface, gheURL string, installationID int64) (string, error) {
+func (v *Provider) GetAppToken(ctx context.Context, kube kubernetes.Interface, gheURL string, installationID int64) (string, error) {
 	// TODO: move this out of here
 	ns := os.Getenv("SYSTEM_NAMESPACE")
 	secret, err := kube.CoreV1().Secrets(ns).Get(ctx, secretName, v1.GetOptions{})
@@ -117,10 +118,11 @@ func (v *Provider) ParsePayload(ctx context.Context, run *params.Run, request *h
 	if id != -1 {
 		// get the app token if it exist first
 		var err error
-		event.Provider.Token, err = v.getAppToken(ctx, run.Clients.Kube, event.Provider.URL, id)
+		event.Provider.Token, err = v.GetAppToken(ctx, run.Clients.Kube, event.Provider.URL, id)
 		if err != nil {
 			return nil, err
 		}
+		v.whichType = provider.ProviderGitHubApp
 	}
 
 	eventInt, err := github.ParseWebHook(event.EventType, []byte(payload))
@@ -135,6 +137,9 @@ func (v *Provider) ParsePayload(ctx context.Context, run *params.Run, request *h
 	if err != nil {
 		return nil, err
 	}
+
+	processedEvent.InstallationID = id
+	processedEvent.GHEURL = event.Provider.URL
 
 	return processedEvent, nil
 }
