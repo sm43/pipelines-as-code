@@ -1,0 +1,46 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: repo-validation
+webhooks:
+  - admissionReviewVersions: ["v1"]
+    clientConfig:
+      service:
+        name: pipelines-as-code-controller
+        namespace: pipelines-as-code
+        port: 8080
+      caBundle: ""
+    failurePolicy: Fail
+    sideEffects: None
+    name: repository-validation.pipelinesascode.tekton.dev
+    rules:
+      - operations: [ "CREATE" ]
+        apiGroups: [ "pipelinesascode.tekton.dev" ]
+        apiVersions: [ "v1alpha1" ]
+        resources: [ "repositories" ]
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-validation
+  namespace: pipelines-as-code
+# The data is populated at install time.
+
+#webhooks:
+#  - name: repo-validation
+#    clientConfig:
+#      service:
+#        name: pipelines-as-code-controller
+#        namespace: pipelines-as-code
+#        path: "/validate"
+#      caBundle: ${WEBHOOK_CA_BUNDLE}
+#    rules:
+#      - operations: ["CREATE"]
+#        apiGroups: ["pipelinesascode.tekton.dev"]
+#        apiVersions: ["v1alpha1"]
+#        resources: ["repositories"]
+#    failurePolicy: Fail
+#    namespaceSelector:
+#      matchLabels:
+#        webhook: enabled

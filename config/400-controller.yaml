@@ -60,6 +60,8 @@ spec:
             successThreshold: 1
             timeoutSeconds: 1
           env:
+            - name: WEBHOOK_SECRET_NAME
+              value: repo-validation
             - name: SYSTEM_NAMESPACE
               valueFrom:
                 fieldRef:

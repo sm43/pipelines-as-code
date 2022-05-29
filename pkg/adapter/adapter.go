@@ -9,6 +9,7 @@ import (
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
+	"github.com/openshift-pipelines/pipelines-as-code/pkg/apis/pipelinesascode/v1alpha1"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/kubeinteraction"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/info"
@@ -19,9 +20,24 @@ import (
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/provider/github"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/provider/gitlab"
 	"go.uber.org/zap"
+	v1 "k8s.io/api/admission/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"knative.dev/eventing/pkg/adapter/v2"
 	"knative.dev/pkg/logging"
 )
+
+var scheme = runtime.NewScheme()
+var codecs = serializer.NewCodecFactory(scheme)
+
+func init() {
+	addToScheme(scheme)
+}
+
+func addToScheme(scheme *runtime.Scheme) {
+	v1.AddToScheme(scheme)
+}
 
 type envConfig struct {
 	adapter.EnvConfig
@@ -66,6 +82,8 @@ func (l *listener) Start(_ context.Context) error {
 	})
 
 	mux.HandleFunc("/", l.handleEvent())
+
+	mux.HandleFunc("/validate", admitFunc(l.validate).serve(l.run))
 
 	srv := &http.Server{
 		Addr: ":8080",
@@ -194,4 +212,114 @@ func (l listener) writeResponse(response http.ResponseWriter, statusCode int, me
 	if err := json.NewEncoder(response).Encode(body); err != nil {
 		l.logger.Errorf("failed to write back sink response: %v", err)
 	}
+}
+
+type admitFunc func(v1.AdmissionReview, *params.Run) *v1.AdmissionResponse
+
+var (
+	universalDeserializer = serializer.NewCodecFactory(runtime.NewScheme()).UniversalDeserializer()
+)
+
+func (l listener) validate(ar v1.AdmissionReview, run *params.Run) *v1.AdmissionResponse {
+	reviewResponse := v1.AdmissionResponse{}
+	reviewResponse.Allowed = true
+
+	raw := ar.Request.Object.Raw
+	repo := v1alpha1.Repository{}
+	if _, _, err := universalDeserializer.Decode(raw, nil, &repo); err != nil {
+		l.logger.Error(err)
+		return toAdmissionResponse(err)
+	}
+
+	exist, err := CheckIfRepoExist(context.Background(), run, &repo, "")
+	if err != nil {
+		l.logger.Error(err)
+		return toAdmissionResponse(err)
+	}
+
+	if exist {
+		toAdmissionResponse(fmt.Errorf("repository already exist"))
+	}
+
+	return &reviewResponse
+}
+
+func serve(w http.ResponseWriter, r *http.Request, admit admitFunc, run *params.Run) {
+	var body []byte
+	if r.Body != nil {
+		if data, err := ioutil.ReadAll(r.Body); err == nil {
+			body = data
+		}
+	}
+
+	// verify the content type is accurate
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "application/json" {
+		fmt.Printf("contentType=%s, expect application/json", contentType)
+		return
+	}
+
+	var reviewResponse *v1.AdmissionResponse
+	ar := v1.AdmissionReview{}
+	deserializer := codecs.UniversalDeserializer()
+	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
+		fmt.Println(err)
+		reviewResponse = toAdmissionResponse(err)
+	}
+
+	response := v1.AdmissionReview{}
+
+	if ar.Request != nil {
+		reviewResponse = admit(ar, run)
+		fmt.Printf("sending response: %v", reviewResponse)
+
+		if reviewResponse != nil {
+			response.Response = reviewResponse
+			response.Response.UID = ar.Request.UID
+		}
+		// reset the Object and OldObject, they are not needed in a response.
+		ar.Request.Object = runtime.RawExtension{}
+		ar.Request.OldObject = runtime.RawExtension{}
+	} else {
+		response.Response = toAdmissionResponse(fmt.Errorf("Invalid admission request"))
+	}
+
+	resp, err := json.Marshal(response)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if _, err := w.Write(resp); err != nil {
+		fmt.Println(err)
+	}
+
+}
+
+func (fn admitFunc) serve(run *params.Run) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		serve(w, r, fn, run)
+	}
+}
+
+func toAdmissionResponse(err error) *v1.AdmissionResponse {
+	return &v1.AdmissionResponse{
+		Result: &metav1.Status{
+			Message: err.Error(),
+		},
+	}
+}
+
+func CheckIfRepoExist(ctx context.Context, cs *params.Run, repo *v1alpha1.Repository, ns string) (bool, error) {
+	repositories, err := cs.Clients.PipelineAsCode.PipelinesascodeV1alpha1().Repositories(ns).List(
+		ctx, metav1.ListOptions{})
+	if err != nil {
+		return false, err
+	}
+	for i := len(repositories.Items) - 1; i >= 0; i-- {
+		repoFromCluster := repositories.Items[i]
+		if repoFromCluster.Spec.URL == repo.Spec.URL {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
