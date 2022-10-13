@@ -106,8 +106,6 @@ func (l listener) handleEvent() http.HandlerFunc {
 			return
 		}
 
-		// read request Body
-
 		// event body
 		payload, err := io.ReadAll(request.Body)
 		if err != nil {
