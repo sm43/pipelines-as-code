@@ -24,7 +24,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.5.0
-	github.com/tektoncd/pipeline v0.40.0
+	github.com/tektoncd/pipeline v0.40.2
 	github.com/xanzy/go-gitlab v0.73.1
 	go.opencensus.io v0.23.0
 	go.uber.org/zap v1.23.0

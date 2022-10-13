@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-# pylint: disable=no-self-use, disable=consider-using-f-string
+# pylint: disable=consider-using-f-string
 #
 # Provision gitea instance with a username password and Repository for Pipelines as Code
-
 import os
-import time
 import subprocess
-import tempfile
 import sys
+import tempfile
+import pathlib
+import time
 
 import requests
 
@@ -19,6 +19,9 @@ GITEA_NS = os.environ.get("GITEA_NS", "gitea")
 GITEA_REPO_NAME_E2E = os.environ.get("GITEA_REPO_NAME", "pac-e2e")
 GITEA_REPO_NAME_PERSO = os.environ.get("GITEA_REPO_NAME_PERSO", "pac")
 OPENSHIFT_ROUTE_FORCE_HTTP = os.environ.get("OPENSHIFT_ROUTE_FORCE_HTTP", False)
+PAC_CONTROLLER_NAMESPACE = os.environ.get(
+    "PAC_CONTROLLER_NAMESPACE", "pipelines-as-code"
+)
 
 GITEA_SMEE_HOOK_URL = os.environ.get("TEST_GITEA_SMEEURL", "")  # will fail if not set
 if GITEA_SMEE_HOOK_URL == "":
@@ -37,21 +40,26 @@ GITEA_REPOS = {
 class ProvisionGitea:
     gitea_host = GITEA_HOST
     gitea_url = GITEA_URL
+    namespace = PAC_CONTROLLER_NAMESPACE
     headers = {"Content-Type": "application/json"}
     token_name = "token"
 
     def apply_deployment_template(self):
         tmpl = os.path.join(os.path.dirname(__file__), "gitea-deployment.yaml")
-        fp = open(tmpl)
-        replaced = (
-            fp.read()
-            .replace("EMPTYBRACKET", "{}")
-            .replace("VAR_GITEA_HOST", self.gitea_host)
-            .replace("VAR_GITEA_URL", self.gitea_url)
-            .replace("VAR_GITEA_SMEE_HOOK_URL", GITEA_SMEE_HOOK_URL)
-        )
-        self.apply_kubectl(replaced)
-        fp.close()
+        with open(tmpl, encoding="utf-8") as fp:
+            replaced = (
+                fp.read()
+                .replace("EMPTYBRACKET", "{}")
+                .replace("VAR_GITEA_HOST", self.gitea_host)
+                .replace("VAR_GITEA_URL", self.gitea_url)
+                .replace("VAR_GITEA_SMEE_HOOK_URL", GITEA_SMEE_HOOK_URL)
+                .replace(
+                    "VAR_URL",
+                    f"http://pipelines-as-code-controller.{self.namespace}:8080",
+                )
+            )
+            self.apply_kubectl(replaced)
+            fp.close()
 
     def wait_for_gitea_to_be_up(self) -> bool:
         i = 0
@@ -76,7 +84,8 @@ class ProvisionGitea:
         print("failed.")
         return False
 
-    def create_user_in_pod(self):
+    @classmethod
+    def create_user_in_pod(cls):
         subprocess.run(
             f"/bin/sh -c \"kubectl -n {GITEA_NS} exec $(kubectl -n {GITEA_NS} get pod --field-selector=status.phase==Running  -l app=gitea -o name|sed 's,.*/,,') --  /bin/bash -c './gitea -c /home/gitea/conf/app.ini admin  user  list|grep -w pac || ./gitea -c /home/gitea/conf/app.ini admin user create --username pac --password pac --admin --access-token --email pac@pac.com'\"",
             shell=True,
@@ -174,16 +183,18 @@ stringData:
         """
         self.apply_kubectl(template)
 
-    def apply_kubectl(self, template: str, ns: str = ""):
+    @classmethod
+    def apply_kubectl(cls, template: str, ns: str = ""):
         # write string to a temporary file
         args = f"-n {ns}" if ns else f"-n {GITEA_NS}"
 
-        tmp = tempfile.mktemp("secretpaaaaccc")
-        open(tmp, "w", encoding="utf-8").write(template)
-        os.system(f"kubectl apply {args} -f {tmp}")
-        os.remove(tmp)
+        tmpfile = pathlib.Path(tempfile.mktemp("secretpaaaaccc"))
+        tmpfile.write_text(template, encoding="utf-8")
+        os.system(f"kubectl apply {args} -f {tmpfile}")
+        tmpfile.unlink()
 
-    def create_ns(self):
+    @classmethod
+    def create_ns(cls):
         subprocess.run(
             f'/bin/sh -c "kubectl get ns -o name {GITEA_NS} >/dev/null || kubectl create ns {GITEA_NS}"',
             shell=True,
