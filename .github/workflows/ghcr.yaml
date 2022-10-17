@@ -2,12 +2,12 @@ name: Create and publish a Docker image to ghcr
 
 on: ["push"]
 
-env:
-  REGISTRY: ghcr.io
-  CONTROLLER_IMAGE_NAME: ${{ github.repository }}-controller
-  WATCHER_IMAGE_NAME: ${{ github.repository }}-watcher
-  WEBHOOK_IMAGE_NAME: ${{ github.repository }}-webhook
-  TKN_PAC_IMAGE_NAME: ${{ github.repository }}-tkn-pac
+#env:
+#  REGISTRY: ghcr.io
+#  CONTROLLER_IMAGE_NAME: ${{ github.repository }}-controller
+#  WATCHER_IMAGE_NAME: ${{ github.repository }}-watcher
+#  WEBHOOK_IMAGE_NAME: ${{ github.repository }}-webhook
+#  TKN_PAC_IMAGE_NAME: ${{ github.repository }}-tkn-pac
 
 jobs:
   build-and-push-image:
@@ -17,76 +17,85 @@ jobs:
       packages: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/setup-go@v2
+          with:
+            go-version: 1.18
+      - uses: actions/checkout@v2
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: imjasonh/setup-ko@v0.6
+      - run: ko build
 
-      - name: Extract metadata (tags, labels) for Docker (Controller)
-        id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.CONTROLLER_IMAGE_NAME }}
 
-      - name: Build and push controller docker image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
-        with:
-          context: .
-          build-args: |
-            BINARY_NAME=pipelines-as-code-controller
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Extract metadata (tags, labels) for Docker (Watcher)
-        id: meta-watcher
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.WATCHER_IMAGE_NAME }}
-
-      - name: Build and push watcher docker image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
-        with:
-          context: .
-          build-args: |
-            BINARY_NAME=pipelines-as-code-watcher
-          push: true
-          tags: ${{ steps.meta-watcher.outputs.tags }}
-          labels: ${{ steps.meta-watcher.outputs.labels }}
-
-      - name: Extract metadata (tags, labels) for Docker (Webhook)
-        id: meta-webhook
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.WEBHOOK_IMAGE_NAME }}
-
-      - name: Build and push webhook docker image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
-        with:
-          context: .
-          build-args: |
-            BINARY_NAME=pipelines-as-code-webhook
-          push: true
-          tags: ${{ steps.meta-webhook.outputs.tags }}
-          labels: ${{ steps.meta-webhook.outputs.labels }}
-
-      - name: Extract metadata (tags, labels) for tkn-pac
-        id: meta-cli
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.TKN_PAC_IMAGE_NAME }}
-
-      - name: Build and push cli docker image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
-        with:
-          context: .
-          build-args: |
-            BINARY_NAME=tkn-pac
-          push: true
-          tags: ${{ steps.meta-cli.outputs.tags }}
-          labels: ${{ steps.meta-cli.outputs.labels }}
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#
+#      - name: Log in to the Container registry
+#        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+#        with:
+#          registry: ${{ env.REGISTRY }}
+#          username: ${{ github.actor }}
+#          password: ${{ secrets.GITHUB_TOKEN }}
+#
+#      - name: Extract metadata (tags, labels) for Docker (Controller)
+#        id: meta
+#        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+#        with:
+#          images: ${{ env.REGISTRY }}/${{ env.CONTROLLER_IMAGE_NAME }}
+#
+#      - name: Build and push controller docker image
+#        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+#        with:
+#          context: .
+#          build-args: |
+#            BINARY_NAME=pipelines-as-code-controller
+#          push: true
+#          tags: ${{ steps.meta.outputs.tags }}
+#          labels: ${{ steps.meta.outputs.labels }}
+#
+#      - name: Extract metadata (tags, labels) for Docker (Watcher)
+#        id: meta-watcher
+#        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+#        with:
+#          images: ${{ env.REGISTRY }}/${{ env.WATCHER_IMAGE_NAME }}
+#
+#      - name: Build and push watcher docker image
+#        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+#        with:
+#          context: .
+#          build-args: |
+#            BINARY_NAME=pipelines-as-code-watcher
+#          push: true
+#          tags: ${{ steps.meta-watcher.outputs.tags }}
+#          labels: ${{ steps.meta-watcher.outputs.labels }}
+#
+#      - name: Extract metadata (tags, labels) for Docker (Webhook)
+#        id: meta-webhook
+#        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+#        with:
+#          images: ${{ env.REGISTRY }}/${{ env.WEBHOOK_IMAGE_NAME }}
+#
+#      - name: Build and push webhook docker image
+#        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+#        with:
+#          context: .
+#          build-args: |
+#            BINARY_NAME=pipelines-as-code-webhook
+#          push: true
+#          tags: ${{ steps.meta-webhook.outputs.tags }}
+#          labels: ${{ steps.meta-webhook.outputs.labels }}
+#
+#      - name: Extract metadata (tags, labels) for tkn-pac
+#        id: meta-cli
+#        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+#        with:
+#          images: ${{ env.REGISTRY }}/${{ env.TKN_PAC_IMAGE_NAME }}
+#
+#      - name: Build and push cli docker image
+#        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+#        with:
+#          context: .
+#          build-args: |
+#            BINARY_NAME=tkn-pac
+#          push: true
+#          tags: ${{ steps.meta-cli.outputs.tags }}
+#          labels: ${{ steps.meta-cli.outputs.labels }}
