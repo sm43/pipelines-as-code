@@ -25,10 +25,15 @@ var _ provider.Interface = (*Provider)(nil)
 type Provider struct {
 	Client        *bitbucket.Client
 	Logger        *zap.SugaredLogger
+	pacInfo       info.PacOpts
 	run           *params.Run
 	Token, APIURL *string
 	Username      *string
 	provenance    string
+}
+
+func (v *Provider) SetPacInfo(pacInfo info.PacOpts) {
+	v.pacInfo = pacInfo
 }
 
 // CheckPolicyAllowing TODO: Implement ME.
@@ -89,7 +94,7 @@ func (v *Provider) CreateStatus(_ context.Context, event *info.Event, statusopts
 	}
 
 	cso := &bitbucket.CommitStatusOptions{
-		Key:         v.run.Info.Pac.ApplicationName,
+		Key:         v.pacInfo.ApplicationName,
 		Url:         detailsURL,
 		State:       statusopts.Conclusion,
 		Description: statusopts.Title,
@@ -119,7 +124,7 @@ func (v *Provider) CreateStatus(_ context.Context, event *info.Event, statusopts
 				Owner:         event.Organization,
 				RepoSlug:      event.Repository,
 				PullRequestID: strconv.Itoa(event.PullRequestNumber),
-				Content:       fmt.Sprintf("**%s%s** - %s\n\n%s", v.run.Info.Pac.ApplicationName, onPr, statusopts.Title, statusopts.Text),
+				Content:       fmt.Sprintf("**%s%s** - %s\n\n%s", v.pacInfo.ApplicationName, onPr, statusopts.Title, statusopts.Text),
 			})
 		if err != nil {
 			return err

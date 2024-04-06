@@ -358,7 +358,7 @@ func (v *Provider) CreateStatus(ctx context.Context, runevent *info.Event, statu
 	if statusOpts.OriginalPipelineRunName != "" {
 		onPr = "/" + statusOpts.OriginalPipelineRunName
 	}
-	statusOpts.Summary = fmt.Sprintf("%s%s %s", v.Run.Info.Pac.ApplicationName, onPr, statusOpts.Summary)
+	statusOpts.Summary = fmt.Sprintf("%s%s %s", v.pacInfo.ApplicationName, onPr, statusOpts.Summary)
 
 	// If we have an installationID which mean we have a github apps and we can use the checkRun API
 	if runevent.InstallationID > 0 {

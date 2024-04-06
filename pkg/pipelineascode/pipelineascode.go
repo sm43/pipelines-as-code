@@ -35,11 +35,12 @@ type PacRun struct {
 	logger       *zap.SugaredLogger
 	eventEmitter *events.EventEmitter
 	manager      *ConcurrencyManager
+	pacInfo      info.PacOpts
 }
 
-func NewPacs(event *info.Event, vcx provider.Interface, run *params.Run, k8int kubeinteraction.Interface, logger *zap.SugaredLogger) PacRun {
+func NewPacs(event *info.Event, vcx provider.Interface, pacInfo info.PacOpts, run *params.Run, k8int kubeinteraction.Interface, logger *zap.SugaredLogger) PacRun {
 	return PacRun{
-		event: event, run: run, vcx: vcx, k8int: k8int, logger: logger,
+		event: event, run: run, vcx: vcx, pacInfo: pacInfo, k8int: k8int, logger: logger,
 		eventEmitter: events.NewEventEmitter(run.Clients.Kube, logger),
 		manager:      NewConcurrencyManager(),
 	}
@@ -74,6 +75,7 @@ func (p *PacRun) Run(ctx context.Context) error {
 			fmt.Sprintf("error processing repository CR custom params: %s", err.Error()))
 	}
 	p.run.Clients.ConsoleUI.SetParams(maptemplate)
+	p.run.Clients.ConsoleUI.SetPacInfo(p.pacInfo)
 
 	var wg sync.WaitGroup
 	for _, match := range matchedPRs {
@@ -127,7 +129,7 @@ func (p *PacRun) startPR(ctx context.Context, match matcher.Match) (*tektonv1.Pi
 	var gitAuthSecretName string
 
 	// Automatically create a secret with the token to be reused by git-clone task
-	if p.run.Info.Pac.SecretAutoCreation {
+	if p.pacInfo.SecretAutoCreation {
 		if annotation, ok := match.PipelineRun.GetAnnotations()[keys.GitAuthSecret]; ok {
 			gitAuthSecretName = annotation
 		} else {
@@ -221,7 +223,7 @@ func (p *PacRun) startPR(ctx context.Context, match matcher.Match) (*tektonv1.Pi
 	}
 
 	// update ownerRef of secret with pipelineRun, so that it gets cleanedUp with pipelineRun
-	if p.run.Info.Pac.SecretAutoCreation {
+	if p.pacInfo.SecretAutoCreation {
 		err := p.k8int.UpdateSecretWithOwnerRef(ctx, p.logger, pr.Namespace, gitAuthSecretName, pr)
 		if err != nil {
 			// we still return the created PR with error, and allow caller to decide what to do with the PR, and avoid

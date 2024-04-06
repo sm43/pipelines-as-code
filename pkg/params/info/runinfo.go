@@ -1,9 +1,13 @@
 package info
 
 type Info struct {
-	Pac        *PacOpts
+	pac        *PacOpts
 	Kube       *KubeOpts
 	Controller *ControllerInfo
+}
+
+func (i *Info) GetPac() PacOpts {
+	return *i.pac
 }
 
 func (i *Info) DeepCopy(out *Info) {

@@ -18,6 +18,7 @@ type Interface interface {
 	URL() string
 	GetName() string
 	SetParams(mt map[string]string)
+	SetPacInfo(info info.PacOpts)
 }
 
 type FallBackConsole struct{}
@@ -47,6 +48,9 @@ func (f FallBackConsole) URL() string {
 }
 
 func (f FallBackConsole) SetParams(_ map[string]string) {
+}
+
+func (f FallBackConsole) SetPacInfo(_ info.PacOpts) {
 }
 
 func New(ctx context.Context, kdyn dynamic.Interface, _ *info.Info) Interface {

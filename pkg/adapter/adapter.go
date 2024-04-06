@@ -132,9 +132,11 @@ func (l listener) handleEvent(ctx context.Context) http.HandlerFunc {
 
 		l.event = info.NewEvent()
 
+		pacInfo := l.run.Info.GetPac()
+
 		// if repository auto configuration is enabled then check if its a valid event
-		if l.run.Info.Pac.AutoConfigureNewGitHubRepo {
-			detected, configuring, err := github.ConfigureRepository(ctx, l.run, request, string(payload), l.logger)
+		if pacInfo.AutoConfigureNewGitHubRepo {
+			detected, configuring, err := github.ConfigureRepository(ctx, l.run, request, string(payload), pacInfo.AutoConfigureRepoNamespaceTemplate, l.logger)
 			if detected {
 				if configuring && err == nil {
 					l.writeResponse(response, http.StatusCreated, "configured")
@@ -162,6 +164,9 @@ func (l listener) handleEvent(ctx context.Context) http.HandlerFunc {
 			gitProvider, logger, err = l.detectProvider(request, string(payload))
 		}
 
+		// set pac opts for the provider
+		gitProvider.SetClient()
+
 		// figure out which provider request coming from
 		if err != nil || gitProvider == nil {
 			l.writeResponse(response, http.StatusOK, err.Error())
@@ -175,6 +180,7 @@ func (l listener) handleEvent(ctx context.Context) http.HandlerFunc {
 			event:   l.event,
 			logger:  logger,
 			payload: payload,
+			pacInfo: pacInfo,
 		}
 
 		// clone the request to use it further

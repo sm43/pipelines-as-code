@@ -53,11 +53,16 @@ type Provider struct {
 	repo         *v1alpha1.Repository
 	eventEmitter *events.EventEmitter
 	run          *params.Run
+	pacInfo      info.PacOpts
 }
 
 // GetTaskURI TODO: Implement ME.
 func (v *Provider) GetTaskURI(_ context.Context, _ *info.Event, _ string) (bool, string, error) {
 	return false, "", nil
+}
+
+func (v *Provider) SetPacInfo(pacInfo info.PacOpts) {
+	v.pacInfo = pacInfo
 }
 
 func (v *Provider) SetLogger(logger *zap.SugaredLogger) {
@@ -142,7 +147,7 @@ func (v *Provider) CreateStatus(_ context.Context, event *info.Event, statusOpts
 		onPr = fmt.Sprintf("/%s", statusOpts.PipelineRunName)
 	}
 	// gitea show weirdly the <br>
-	statusOpts.Summary = fmt.Sprintf("%s%s %s", v.run.Info.Pac.ApplicationName, onPr, statusOpts.Summary)
+	statusOpts.Summary = fmt.Sprintf("%s%s %s", v.pacInfo.ApplicationName, onPr, statusOpts.Summary)
 
 	return v.createStatusCommit(event, v.run.Info.Pac, statusOpts)
 }

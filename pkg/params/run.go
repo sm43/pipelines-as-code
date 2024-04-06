@@ -3,10 +3,8 @@ package params
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 
-	"github.com/openshift-pipelines/pipelines-as-code/pkg/consoleui"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/clients"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/info"
 	"github.com/openshift-pipelines/pipelines-as-code/pkg/params/settings"
@@ -34,7 +32,9 @@ func (r *Run) UpdatePACInfo(ctx context.Context) error {
 		return err
 	}
 
-	if err = settings.ConfigToSettings(r.Clients.Log, r.Info.Pac.Settings, cfg.Data); err != nil {
+	settingIns := settings.Settings{}
+
+	if err = settings.ConfigToSettings(r.Clients.Log, &settingIns, cfg.Data); err != nil {
 		return err
 	}
 
@@ -48,7 +48,7 @@ func (r *Run) UpdatePACInfo(ctx context.Context) error {
 	}
 	if r.Info.Pac.Settings.CustomConsoleURL != "" {
 		r.Clients.Log.Infof("updating console url to: %s", r.Info.Pac.Settings.CustomConsoleURL)
-		r.Clients.ConsoleUI = &consoleui.CustomConsole{Info: &r.Info}
+		r.Clients.ConsoleUI = &consoleui.CustomConsole{}
 	}
 
 	// This is the case when reverted settings for CustomConsole and TektonDashboard then URL should point to OpenshiftConsole for Openshift platform
@@ -70,12 +70,12 @@ func New() *Run {
 	})
 	return &Run{
 		Info: info.Info{
-			Pac: &info.PacOpts{
-				Settings: &settings.Settings{
-					ApplicationName: settings.PACApplicationNameDefaultValue,
-					HubCatalogs:     hubCatalog,
-				},
-			},
+			// Pac: &info.PacOpts{
+			// 	Settings: &settings.Settings{
+			// 		ApplicationName: settings.PACApplicationNameDefaultValue,
+			// 		HubCatalogs:     hubCatalog,
+			// 	},
+			// },
 			Kube:       &info.KubeOpts{},
 			Controller: &info.ControllerInfo{},
 		},
